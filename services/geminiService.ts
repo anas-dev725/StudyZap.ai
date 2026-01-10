@@ -1,7 +1,16 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { QuizQuestion } from "../types";
 
-const apiKey = process.env.API_KEY;
+// Declare process to avoid TypeScript errors in client-side environments if @types/node is missing
+declare var process: {
+  env: {
+    GEMINI_API_KEY?: string;
+    [key: string]: string | undefined;
+  }
+};
+
+// Use the specific environment variable GEMINI_API_KEY as requested
+const apiKey = process.env.GEMINI_API_KEY;
 
 // Supported MIME types for Gemini API inlineData
 const SUPPORTED_MIME_TYPES = [
@@ -35,7 +44,7 @@ export const generateStudyNotes = async (
   fileData: string,
   mimeType: string
 ): Promise<string> => {
-  if (!apiKey) throw new Error("API Key not found");
+  if (!apiKey) throw new Error("API Key not found in process.env.GEMINI_API_KEY");
   
   validateMimeType(mimeType);
 
@@ -101,7 +110,7 @@ export const generateQuiz = async (
   fileData: string,
   mimeType: string
 ): Promise<QuizQuestion[]> => {
-  if (!apiKey) throw new Error("API Key not found");
+  if (!apiKey) throw new Error("API Key not found in process.env.GEMINI_API_KEY");
   
   // We don't validate MIME here again strictly if called after generateStudyNotes, 
   // but good practice if called independently.
@@ -168,7 +177,7 @@ export const generateQuizFeedback = async (
   total: number,
   topic: string
 ): Promise<string> => {
-    if (!apiKey) throw new Error("API Key not found");
+    if (!apiKey) throw new Error("API Key not found in process.env.GEMINI_API_KEY");
     const ai = new GoogleGenAI({ apiKey });
 
     const prompt = `
@@ -193,7 +202,7 @@ export const chatWithDocument = async (
     history: {role: string, parts: {text: string}[]}[],
     message: string
 ) => {
-    if (!apiKey) throw new Error("API Key not found");
+    if (!apiKey) throw new Error("API Key not found in process.env.GEMINI_API_KEY");
     const ai = new GoogleGenAI({ apiKey });
 
     const contents = [

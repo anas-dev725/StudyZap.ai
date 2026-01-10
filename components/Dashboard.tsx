@@ -626,7 +626,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, isDark, toggleTheme, onLogo
                 <div className="flex-1 flex flex-col md:flex-row gap-4 md:gap-6 min-h-0 overflow-hidden md:overflow-visible">
                    {/* Question Side - Reduced size on mobile */}
                    <Card className="flex-none md:flex-1 p-5 md:p-8 flex items-center justify-center bg-brand-purple text-white relative overflow-hidden min-h-[160px] md:min-h-[300px] shrink-0">
-                      <div className="absolute top-0 right-0 p-10 opacity-10"><Brain size={120} md-size={200} /></div>
+                      <div className="absolute top-0 right-0 p-10 opacity-10"><Brain className="w-[120px] h-[120px] md:w-[200px] md:h-[200px]" /></div>
                       <h2 className="text-lg md:text-3xl font-heading font-bold text-center leading-relaxed relative z-10">
                          {activeProject.content.quiz[currentQuizQuestion].question}
                       </h2>
