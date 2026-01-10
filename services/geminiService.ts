@@ -1,16 +1,32 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { QuizQuestion } from "../types";
 
-// Declare process to avoid TypeScript errors in client-side environments if @types/node is missing
-declare var process: {
-  env: {
-    GEMINI_API_KEY?: string;
-    [key: string]: string | undefined;
+// Helper function to safely retrieve API key from various potential sources
+// without crashing the browser if 'process' is undefined.
+const getApiKey = (): string | undefined => {
+  try {
+    // Check for Vite-style environment variables (standard for Vercel + React)
+    // @ts-ignore
+    if (typeof import.meta !== 'undefined' && import.meta.env) {
+      // @ts-ignore
+      if (import.meta.env.VITE_GEMINI_API_KEY) return import.meta.env.VITE_GEMINI_API_KEY;
+      // @ts-ignore
+      if (import.meta.env.GEMINI_API_KEY) return import.meta.env.GEMINI_API_KEY;
+    }
+
+    // Check for Node/CRA-style environment variables
+    if (typeof process !== 'undefined' && process.env) {
+      return process.env.GEMINI_API_KEY || 
+             process.env.VITE_GEMINI_API_KEY || 
+             process.env.REACT_APP_GEMINI_API_KEY;
+    }
+  } catch (e) {
+    console.warn("Failed to retrieve API key safely:", e);
   }
+  return undefined;
 };
 
-// Use the specific environment variable GEMINI_API_KEY as requested
-const apiKey = process.env.GEMINI_API_KEY;
+const apiKey = getApiKey();
 
 // Supported MIME types for Gemini API inlineData
 const SUPPORTED_MIME_TYPES = [
@@ -44,7 +60,7 @@ export const generateStudyNotes = async (
   fileData: string,
   mimeType: string
 ): Promise<string> => {
-  if (!apiKey) throw new Error("API Key not found in process.env.GEMINI_API_KEY");
+  if (!apiKey) throw new Error("API Key not found. Please set GEMINI_API_KEY or VITE_GEMINI_API_KEY in your environment variables.");
   
   validateMimeType(mimeType);
 
@@ -110,7 +126,7 @@ export const generateQuiz = async (
   fileData: string,
   mimeType: string
 ): Promise<QuizQuestion[]> => {
-  if (!apiKey) throw new Error("API Key not found in process.env.GEMINI_API_KEY");
+  if (!apiKey) throw new Error("API Key not found. Please set GEMINI_API_KEY or VITE_GEMINI_API_KEY in your environment variables.");
   
   // We don't validate MIME here again strictly if called after generateStudyNotes, 
   // but good practice if called independently.
@@ -177,7 +193,7 @@ export const generateQuizFeedback = async (
   total: number,
   topic: string
 ): Promise<string> => {
-    if (!apiKey) throw new Error("API Key not found in process.env.GEMINI_API_KEY");
+    if (!apiKey) throw new Error("API Key not found. Please set GEMINI_API_KEY or VITE_GEMINI_API_KEY in your environment variables.");
     const ai = new GoogleGenAI({ apiKey });
 
     const prompt = `
@@ -202,7 +218,7 @@ export const chatWithDocument = async (
     history: {role: string, parts: {text: string}[]}[],
     message: string
 ) => {
-    if (!apiKey) throw new Error("API Key not found in process.env.GEMINI_API_KEY");
+    if (!apiKey) throw new Error("API Key not found. Please set GEMINI_API_KEY or VITE_GEMINI_API_KEY in your environment variables.");
     const ai = new GoogleGenAI({ apiKey });
 
     const contents = [
