@@ -38,35 +38,7 @@ export const generateStudyNotes = async (
   // Exclusively use process.env.API_KEY for initialization as per system requirements.
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
-  const prompt = `
-    You are an elite academic tutor named "Zap". Analyze the provided document.
-    Generate a highly structured study guide that covers every important detail.
-    
-    Format your response strictly using these markdown sections:
-
-    ## 🚀 Overview
-    Explain the main topic and purpose of the document in a concise way.
-
-    ## 🔑 Key Concepts & Definitions
-    List the most important terms and concepts found in the text.
-    - Concept 1: Definition...
-    - Concept 2: Definition...
-
-    ## 🧠 Core Details & Analysis
-    Break down the main sections of the document. Explain the "How" and "Why".
-    Cover specific details like methodologies, processes, or theories mentioned.
-
-    ## 🌍 Real-World Applications
-    Provide 3 concrete examples or use cases of these concepts in real life.
-    
-    ## 💡 Exam Cheatsheet
-    List 5 specific things that are highly likely to appear on an exam based on this content.
-    
-    ## ❓ Potential Exam Questions
-    List 3-5 short answer or essay style questions that a professor might ask, along with brief bullet-point answers.
-
-    Do not use asterisks ** around headers, use the ## syntax. Use ** only for highlighting specific keywords inside sentences.
-  `;
+  const prompt = `Analyze the provided document and generate a highly structured study guide that covers every important detail.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -81,6 +53,35 @@ export const generateStudyNotes = async (
           },
           { text: prompt }
         ]
+      },
+      config: {
+        systemInstruction: `
+          You are an elite academic tutor named "Zap". 
+          Format your response strictly using these markdown sections:
+
+          ## 🚀 Overview
+          Explain the main topic and purpose of the document in a concise way.
+
+          ## 🔑 Key Concepts & Definitions
+          List the most important terms and concepts found in the text.
+          - Concept 1: Definition...
+          - Concept 2: Definition...
+
+          ## 🧠 Core Details & Analysis
+          Break down the main sections of the document. Explain the "How" and "Why".
+          Cover specific details like methodologies, processes, or theories mentioned.
+
+          ## 🌍 Real-World Applications
+          Provide 3 concrete examples or use cases of these concepts in real life.
+          
+          ## 💡 Exam Cheatsheet
+          List 5 specific things that are highly likely to appear on an exam based on this content.
+          
+          ## ❓ Potential Exam Questions
+          List 3-5 short answer or essay style questions that a professor might ask, along with brief bullet-point answers.
+
+          Do not use asterisks ** around headers, use the ## syntax. Use ** only for highlighting specific keywords inside sentences.
+        `
       }
     });
 
@@ -102,13 +103,7 @@ export const generateQuiz = async (
 
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-  const prompt = `
-    Based on the provided document, generate a fun and challenging quiz.
-    Create exactly 10 multiple-choice questions.
-    The tone should be slightly playful but educational.
-    Ensure the questions map to the key topics in the document.
-    Avoid obvious answers.
-  `;
+  const prompt = `Based on the provided document, generate a fun and challenging quiz.`;
 
   try {
     const response = await ai.models.generateContent({
@@ -125,6 +120,12 @@ export const generateQuiz = async (
         ]
       },
       config: {
+        systemInstruction: `
+          Create exactly 10 multiple-choice questions based on the provided content.
+          The tone should be slightly playful but educational.
+          Ensure the questions map to the key topics in the document.
+          Avoid obvious answers.
+        `,
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.ARRAY,
@@ -163,17 +164,19 @@ export const generateQuizFeedback = async (
 ): Promise<string> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-    const prompt = `
-        The student scored ${score} out of ${total} on a quiz about "${topic}".
-        If the score is high (>80%), be super celebratory and enthusiastic.
-        If the score is low, be encouraging but acknowledge it was tough.
-        Provide 1 specific tip for improvement.
-        Keep it under 60 words.
-    `;
+    const prompt = `The student scored ${score} out of ${total} on a quiz about "${topic}". Provide feedback.`;
 
     const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: prompt
+        contents: prompt,
+        config: {
+            systemInstruction: `
+                If the score is high (>80%), be super celebratory and enthusiastic.
+                If the score is low, be encouraging but acknowledge it was tough.
+                Provide 1 specific tip for improvement.
+                Keep it under 60 words.
+            `
+        }
     });
 
     return response.text || "Keep studying!";
@@ -188,6 +191,7 @@ export const chatWithDocument = async (
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
     const contents = [
+        ...history,
         {
             role: 'user',
             parts: [
@@ -197,14 +201,17 @@ export const chatWithDocument = async (
                         data: stripBase64Prefix(fileData)
                     }
                 },
-                { text: `Context: You are "Zap", a fun and helpful AI study buddy. Answer the user's question based strictly on the document provided above. Keep it concise. Question: ${message}` }
+                { text: message }
             ]
         }
     ];
 
     const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: contents
+        contents: contents,
+        config: {
+            systemInstruction: "You are 'Zap', a fun and helpful AI study buddy. Answer the user's question based strictly on the document provided. Keep it concise."
+        }
     });
 
     return response.text || "I couldn't generate a response.";
