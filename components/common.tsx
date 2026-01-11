@@ -1,20 +1,25 @@
+
 import React, { useState } from 'react';
 import { Moon, Sun, Eye, EyeOff } from 'lucide-react';
 
-export const Button = ({ 
+/* Interface defining props for the Button component */
+export interface ButtonProps {
+  children: React.ReactNode;
+  onClick?: () => void;
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'glass' | 'danger' | 'yellow';
+  className?: string;
+  disabled?: boolean;
+  type?: 'button' | 'submit' | 'reset';
+}
+
+/* Refactor Button to React.FC to ensure children and key props are handled correctly by TypeScript */
+export const Button: React.FC<ButtonProps> = ({ 
   children, 
   onClick, 
   variant = 'primary', 
   className = '', 
   disabled = false,
   type = 'button'
-}: { 
-  children: React.ReactNode; 
-  onClick?: () => void; 
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'glass' | 'danger' | 'yellow'; 
-  className?: string;
-  disabled?: boolean;
-  type?: 'button' | 'submit' | 'reset';
 }) => {
   const baseStyle = "px-6 py-3 rounded-2xl font-heading font-bold transition-all duration-200 flex items-center justify-center gap-2 focus:outline-none focus:ring-4 disabled:opacity-50 disabled:cursor-not-allowed transform active:scale-95 text-base tracking-wide shadow-sm";
   
@@ -40,7 +45,14 @@ export const Button = ({
   );
 };
 
-export const Card = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => (
+/* Interface defining props for the Card component */
+export interface CardProps {
+  children: React.ReactNode;
+  className?: string;
+}
+
+/* Refactor Card to React.FC to resolve "children" and "key" property errors in usage */
+export const Card: React.FC<CardProps> = ({ children, className = '' }) => (
   <div className={`rounded-3xl transition-all duration-300 ${className.includes('bg-') ? className : 'bg-white dark:bg-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-slate-950/50 border border-slate-100 dark:border-slate-700'} ${className}`}>
     {children}
   </div>
