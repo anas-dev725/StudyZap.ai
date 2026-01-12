@@ -117,10 +117,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, isDark, toggleTheme, onLogo
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
-      if (!selectedFile.type.match(/(pdf|text|image|json)/) && !selectedFile.name.endsWith('.md')) {
-         alert("Unsupported file type. Please upload a PDF, Text file, or Image.");
-         return;
-      }
+        // Validation for PDF, Text, Images, JSON, Markdown, CSV
+        const isValidType = selectedFile.type.match(/(pdf|text|image|json|csv)/) || 
+                            selectedFile.name.match(/\.(md|txt|csv|json)$/i);
+
+        if (!isValidType) {
+            alert("Unsupported file type. Please upload a PDF, Text file, Markdown, CSV, or Image.");
+            return;
+        }
 
       const reader = new FileReader();
       reader.onload = async (event) => {
@@ -130,7 +134,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, isDark, toggleTheme, onLogo
             id: Date.now().toString(),
             file: {
                 name: selectedFile.name,
-                type: selectedFile.type,
+                type: selectedFile.type || 'application/octet-stream',
                 data: base64Data
             },
             content: null,
@@ -160,6 +164,15 @@ const Dashboard: React.FC<DashboardProps> = ({ user, isDark, toggleTheme, onLogo
     e.target.value = ''; 
   };
 
+  const getFileTypeLabel = (type: string, name: string) => {
+    if (type.includes('pdf')) return 'PDF';
+    if (type.includes('image')) return 'IMG';
+    if (type.includes('text') || name.endsWith('.txt') || name.endsWith('.md')) return 'TEXT';
+    if (type.includes('json')) return 'JSON';
+    if (type.includes('csv')) return 'CSV';
+    return 'FILE';
+  };
+
   const switchToProject = (projectId: string) => {
     const project = projects.find(p => p.id === projectId);
     if (!project) return;
@@ -177,6 +190,50 @@ const Dashboard: React.FC<DashboardProps> = ({ user, isDark, toggleTheme, onLogo
     } else if (project.content) {
         setActiveTab(DashboardTab.NOTES);
     } else {
+        setActiveTab(DashboardTab.UPLOAD);
+    }
+  };
+
+  const handleDeleteProject = () => {
+    if (!activeProjectId) return;
+    if (!window.confirm("Are you sure you want to delete this project?")) return;
+
+    // Use functional update to ensure we are filtering based on latest state
+    setProjects(currentProjects => {
+        const remainingProjects = currentProjects.filter(p => p.id !== activeProjectId);
+        
+        // Handle post-deletion navigation inside the update to ensure consistency
+        // Note: We can't set other states directly here safely if they depend on the result, 
+        // but since we are scheduling updates, we'll do it outside or use an effect. 
+        // For simplicity in this handler, we calculate remainingProjects locally as well.
+        return remainingProjects;
+    });
+
+    // Calculate remaining projects locally to decide where to navigate immediately
+    const remainingProjects = projects.filter(p => p.id !== activeProjectId);
+
+    if (remainingProjects.length > 0) {
+        // Switch to the most recent project (last in the list, or the one before the deleted one)
+        // For simple UX, let's pick the last one available.
+        const nextProject = remainingProjects[remainingProjects.length - 1];
+        setActiveProjectId(nextProject.id);
+        
+        // Reset states
+        setCurrentQuizQuestion(0);
+        setSelectedAnswers([]);
+        setChatHistory([]);
+
+        // Determine tab
+        if (nextProject.quizResult) {
+            setActiveTab(DashboardTab.RESULTS);
+        } else if (nextProject.content) {
+            setActiveTab(DashboardTab.NOTES);
+        } else {
+            setActiveTab(DashboardTab.UPLOAD);
+        }
+    } else {
+        // No projects left
+        setActiveProjectId(null);
         setActiveTab(DashboardTab.UPLOAD);
     }
   };
@@ -255,7 +312,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, isDark, toggleTheme, onLogo
       if (selectedAnswers[idx] === q.correctAnswerIndex) score++;
     });
     
-    const feedback = await generateQuizFeedback(score, activeProject.content.quiz.length, activeProject.file.name);
+    // Updated to pass quiz questions and user answers for detailed feedback
+    const feedback = await generateQuizFeedback(
+        score, 
+        activeProject.content.quiz.length, 
+        activeProject.file.name,
+        activeProject.content.quiz,
+        selectedAnswers
+    );
     
     const result: QuizResult = {
       score,
@@ -682,13 +746,13 @@ const Dashboard: React.FC<DashboardProps> = ({ user, isDark, toggleTheme, onLogo
                             </div>
                             </div>
                             <h2 className="text-4xl font-heading font-extrabold mb-4">Feed me knowledge! 📄</h2>
-                            <p className="text-xl text-slate-500 mb-10">Upload your PDF or notes. I'll turn them into a study plan.</p>
+                            <p className="text-xl text-slate-500 mb-10">Upload your PDF, Text, Markdown, CSV, or Image files.</p>
                             
                             <div className="relative group cursor-pointer max-w-xl mx-auto">
                                 <div className="absolute -inset-1 bg-gradient-to-r from-brand-purple to-brand-orange rounded-2xl blur opacity-25 group-hover:opacity-75 transition duration-200"></div>
                                 <button onClick={() => document.getElementById('main-upload')?.click()} className="relative w-full bg-white dark:bg-slate-800 p-12 rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-600 hover:border-brand-purple dark:hover:border-brand-purple transition-all flex flex-col items-center gap-4">
                                     <span className="font-heading font-bold text-2xl text-brand-dark dark:text-white">Click to Upload</span>
-                                    <span className="text-slate-400 font-bold">PDF, TXT, MD (Max 10MB)</span>
+                                    <span className="text-slate-400 font-bold">PDF, TXT, MD, CSV, IMG</span>
                                 </button>
                                 <input 
                                     type="file" 
@@ -719,7 +783,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, isDark, toggleTheme, onLogo
                                         }`}
                                     >
                                         <div className="p-3 rounded-full bg-brand-light dark:bg-slate-900 text-brand-purple">
-                                            <FileText size={24} />
+                                            <span className="font-bold text-xs">{getFileTypeLabel(p.file.type, p.file.name)}</span>
                                         </div>
                                         <span className="text-sm font-bold truncate w-full text-center">{p.file.name}</span>
                                         {p.content && <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-blue-500"></div>}
@@ -754,7 +818,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, isDark, toggleTheme, onLogo
                                         </div>
                                         <div>
                                             <h3 className="text-2xl font-bold">{activeProject.file.name}</h3>
-                                            <p className="text-slate-500 text-sm font-bold uppercase">{activeProject.file.type.split('/')[1] || 'DOC'}</p>
+                                            <p className="text-slate-500 text-sm font-bold uppercase">{getFileTypeLabel(activeProject.file.type, activeProject.file.name)}</p>
                                         </div>
                                     </div>
                                     
@@ -778,14 +842,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, isDark, toggleTheme, onLogo
                                             </Button>
                                         )}
                                         
-                                        <Button onClick={() => {
-                                            if(confirm("Are you sure you want to delete this project?")) {
-                                                const newProjects = projects.filter(p => p.id !== activeProjectId);
-                                                setProjects(newProjects);
-                                                if(newProjects.length > 0) switchToProject(newProjects[0].id);
-                                                else setActiveProjectId(null);
-                                            }
-                                        }} variant="danger" className="w-full col-span-2">
+                                        <Button onClick={handleDeleteProject} variant="danger" className="w-full col-span-2">
                                             Delete Project
                                         </Button>
                                     </div>
@@ -809,6 +866,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, isDark, toggleTheme, onLogo
                     <div ref={notesRef}>
                         <MarkdownText text={activeProject.content.notes} />
                     </div>
+                </div>
+                {/* Take Quiz Button at Bottom of Notes */}
+                <div className="mt-12 flex justify-center">
+                    <Button onClick={() => setActiveTab(DashboardTab.QUIZ)} variant="primary" className="px-8 py-5 text-lg shadow-xl hover:scale-105 transition-transform animate-pop">
+                        <Target className="mr-2" size={24} /> Let's Take a Quiz
+                    </Button>
                 </div>
              </div>
            )}

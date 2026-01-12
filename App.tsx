@@ -166,7 +166,11 @@ export default function App() {
   return (
     <div className={isDark ? 'dark' : ''}>
       {currentView === AppView.LANDING && (
-        <LandingPage onGetStarted={() => setCurrentView(AppView.AUTH)} />
+        <LandingPage 
+          onGetStarted={() => setCurrentView(AppView.AUTH)} 
+          isDark={isDark}
+          toggleTheme={() => setIsDark(!isDark)}
+        />
       )}
       
       {currentView === AppView.AUTH && renderAuth()}

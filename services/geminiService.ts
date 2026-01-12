@@ -1,7 +1,8 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { QuizQuestion } from "../types";
 
-// Supported MIME types for Gemini API inlineData
+// Supported MIME types for Gemini API
+// Note: Office formats (DOCX, PPTX, XLSX) are NOT supported natively by Gemini via inlineData.
 const SUPPORTED_MIME_TYPES = [
   'application/pdf',
   'text/plain',
@@ -23,10 +24,37 @@ const stripBase64Prefix = (base64: string): string => {
   return base64.split(',')[1] || base64;
 };
 
+// Helper to safely decode Base64 to UTF-8 text
+const base64ToText = (base64: string): string => {
+  const raw = atob(base64);
+  try {
+    return decodeURIComponent(escape(raw));
+  } catch (e) {
+    return raw;
+  }
+};
+
 const validateMimeType = (mimeType: string) => {
   if (!SUPPORTED_MIME_TYPES.includes(mimeType)) {
-    throw new Error(`Unsupported file type: ${mimeType}. Please upload a PDF, Text file, Markdown, or Image.`);
+    throw new Error(`Unsupported file type: ${mimeType}. Please upload a PDF, Text file, Markdown, CSV, or Image.`);
   }
+};
+
+const getFilePart = (fileData: string, mimeType: string) => {
+  const cleanBase64 = stripBase64Prefix(fileData);
+  
+  // For text-based formats, send as text part to avoid encoding/MIME issues
+  if (mimeType.startsWith('text/') || mimeType === 'application/json') {
+     return { text: base64ToText(cleanBase64) };
+  }
+  
+  // For binaries (PDF, Images), use inlineData
+  return {
+    inlineData: {
+      mimeType: mimeType,
+      data: cleanBase64
+    }
+  };
 };
 
 export const generateStudyNotes = async (
@@ -45,12 +73,7 @@ export const generateStudyNotes = async (
       model: 'gemini-3-flash-preview',
       contents: {
         parts: [
-          {
-            inlineData: {
-              mimeType: mimeType,
-              data: stripBase64Prefix(fileData)
-            }
-          },
+          getFilePart(fileData, mimeType),
           { text: prompt }
         ]
       },
@@ -89,7 +112,7 @@ export const generateStudyNotes = async (
   } catch (error: any) {
     console.error("Error generating notes:", error);
     if (error.message?.includes('400') || error.status === 400) {
-       throw new Error("The AI model rejected this file. Please ensure it is a valid PDF or Text file.");
+       throw new Error(`The AI model rejected this file (${mimeType}). Please ensure it is a valid PDF, Text, or Image file.`);
     }
     throw error;
   }
@@ -110,12 +133,7 @@ export const generateQuiz = async (
       model: 'gemini-3-flash-preview',
       contents: {
         parts: [
-          {
-            inlineData: {
-              mimeType: mimeType,
-              data: stripBase64Prefix(fileData)
-            }
-          },
+          getFilePart(fileData, mimeType),
           { text: prompt }
         ]
       },
@@ -160,9 +178,19 @@ export const generateQuiz = async (
 export const generateQuizFeedback = async (
   score: number,
   total: number,
-  topic: string
+  topic: string,
+  quizQuestions: QuizQuestion[],
+  userAnswers: number[]
 ): Promise<string> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+    // Identify incorrect topics to give specific feedback
+    const incorrectDetails = quizQuestions.map((q, i) => {
+        if (userAnswers[i] !== q.correctAnswerIndex) {
+            return `Question: "${q.question}" (Student Answered: ${q.options[userAnswers[i]] || 'Skipped'}; Correct: ${q.options[q.correctAnswerIndex]})`;
+        }
+        return null;
+    }).filter(Boolean).join('\n');
 
     const prompt = `The student scored ${score} out of ${total} on a quiz about "${topic}". Provide feedback.`;
 
@@ -171,15 +199,24 @@ export const generateQuizFeedback = async (
         contents: prompt,
         config: {
             systemInstruction: `
-                If the score is high (>80%), be super celebratory and enthusiastic.
-                If the score is low, be encouraging but acknowledge it was tough.
-                Provide 1 specific tip for improvement.
-                Keep it under 60 words.
+                The student scored ${score}/${total}.
+                
+                Here is the context of what they missed:
+                ${incorrectDetails || "They got everything right!"}
+
+                Instructions:
+                1. If the score is high (>80%), be super celebratory and enthusiastic.
+                2. If the score is low, be encouraging but acknowledge it was tough.
+                3. CRITICAL: Based on the missed questions above, identify 2-3 specific sub-topics or concepts they should revisit. Be very specific about what to study.
+                4. Keep the response under 80 words.
+                5. Do NOT use markdown bolding (asterisks like **text**). Write in plain text only.
             `
         }
     });
 
-    return response.text || "Keep studying!";
+    // Manually strip asterisks if the model ignores the instruction
+    const rawText = response.text || "Keep studying!";
+    return rawText.replace(/\*\*/g, '');
 }
 
 export const chatWithDocument = async (
@@ -190,17 +227,15 @@ export const chatWithDocument = async (
 ) => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
+    // Use getFilePart to handle text vs binary correctly in chat context
+    const filePart = getFilePart(fileData, mimeType);
+
     const contents = [
         ...history,
         {
             role: 'user',
             parts: [
-                {
-                    inlineData: {
-                        mimeType: mimeType,
-                        data: stripBase64Prefix(fileData)
-                    }
-                },
+                filePart,
                 { text: message }
             ]
         }

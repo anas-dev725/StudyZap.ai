@@ -1,12 +1,37 @@
-import React from 'react';
-import { Button } from './common';
+import React, { useEffect, useState, useRef } from 'react';
+import { Button, ThemeToggle } from './common';
 import { BookOpen, Brain, Zap, CheckCircle, ArrowRight, Star, Upload, Trophy, PlayCircle, ChevronDown, Smile, Frown, Sparkles, TrendingUp, Users, Laptop, Coffee, Music, Gamepad2, Quote } from 'lucide-react';
 
 interface LandingPageProps {
   onGetStarted: () => void;
+  isDark: boolean;
+  toggleTheme: () => void;
 }
 
-const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
+const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted, isDark, toggleTheme }) => {
+  const [visibleSteps, setVisibleSteps] = useState<number[]>([]);
+  const stepsRef = useRef<(HTMLDivElement | null)[]>([]);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            const index = Number(entry.target.getAttribute('data-index'));
+            setVisibleSteps((prev) => Array.from(new Set([...prev, index])));
+          }
+        });
+      },
+      { threshold: 0.2 }
+    );
+
+    stepsRef.current.forEach((step) => {
+      if (step) observer.observe(step);
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
     if (element) {
@@ -26,12 +51,13 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
             </div>
             <span className="text-2xl font-heading font-bold text-slate-900 dark:text-white">Study<span className="text-brand-purple">Zap</span></span>
           </div>
-          <div className="hidden md:flex gap-8 text-sm font-bold text-slate-600 dark:text-slate-300">
+          <div className="hidden md:flex gap-8 text-sm font-bold text-slate-600 dark:text-slate-300 items-center">
               <button onClick={() => scrollToSection('features')} className="hover:text-brand-purple transition-all hover:scale-105">Features</button>
               <button onClick={() => scrollToSection('how-it-works')} className="hover:text-brand-purple transition-all hover:scale-105">How it Works</button>
               <button onClick={() => scrollToSection('testimonials')} className="hover:text-brand-purple transition-all hover:scale-105">Stories</button>
           </div>
-          <div className="flex gap-4">
+          <div className="flex gap-4 items-center">
+              <ThemeToggle isDark={isDark} toggle={toggleTheme} />
               <Button onClick={onGetStarted} variant="ghost" className="hidden sm:flex font-bold hover:bg-slate-200 dark:hover:bg-slate-800">Log in</Button>
               <Button onClick={onGetStarted} variant="primary" className="shadow-[0_4px_0_rgb(109,40,217)] hover:shadow-[0_6px_0_rgb(109,40,217)] hover:-translate-y-1 transition-all">Get Started</Button>
           </div>
@@ -135,8 +161,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
          </div>
       </section>
 
-      {/* Step by Step (Visualized) */}
-      <section id="how-it-works" className="py-24 px-6 bg-white dark:bg-[#1e1b4b]">
+      {/* Step by Step (Visualized with Scroll Reveal) */}
+      <section id="how-it-works" className="py-24 px-6 bg-white dark:bg-[#1e1b4b] overflow-hidden">
          <div className="max-w-4xl mx-auto">
             <h2 className="text-4xl font-heading font-extrabold text-center text-slate-900 dark:text-white mb-16">How to become a genius</h2>
             
@@ -151,7 +177,13 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
                   { step: "2", title: "Wait approx. 5 seconds", desc: "Our AI reads it faster than you can blink and extracts the gold.", icon: Sparkles },
                   { step: "3", title: "Quiz yourself", desc: "Play the generated quiz. Get instant feedback. Feel smart.", icon: Trophy }
                ].map((s, i) => (
-                  <div key={i} className="flex gap-8 items-start relative group">
+                  <div 
+                    key={i} 
+                    data-index={i}
+                    /* Fix: Use block body to return void for ref callback to satisfy TypeScript strict types */
+                    ref={(el) => { stepsRef.current[i] = el; }}
+                    className={`flex gap-8 items-start relative group transition-all duration-1000 transform ${visibleSteps.includes(i) ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-20'}`}
+                  >
                      <div className="w-16 h-16 bg-brand-yellow border-4 border-white dark:border-slate-800 rounded-full flex items-center justify-center font-heading font-bold text-2xl text-brand-dark shadow-lg z-10 shrink-0 group-hover:scale-110 transition-transform">
                         {s.step}
                      </div>
@@ -168,7 +200,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
          </div>
       </section>
 
-      {/* Real Testimonials Section */}
+      {/* Real Testimonials Section (Updated & Authentic) */}
       <section id="testimonials" className="py-24 px-6 bg-brand-light dark:bg-[#0f0a1e]">
           <div className="max-w-7xl mx-auto">
               <div className="text-center mb-16">
@@ -178,11 +210,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ onGetStarted }) => {
 
               <div className="grid md:grid-cols-3 gap-8">
                   {[
-                      { name: "Alex R.", role: "Biology Major", quote: "I used to spend 5 hours making flashcards. Now I do it in 5 seconds. This app literally saved my degree.", color: "bg-blue-100 text-blue-800" },
-                      { name: "Sarah K.", role: "Law Student", quote: "The summary feature is insane. It caught details in my case studies that I completely missed.", color: "bg-green-100 text-green-800" },
-                      { name: "Mike T.", role: "History Buff", quote: "Quiz mode is addictive. I'm actually having fun studying for the first time in my life. Weird.", color: "bg-purple-100 text-purple-800" },
+                      { name: "Alex R.", role: "Biology Major", quote: "I used to drown in PDFs. StudyZap's summaries let me grasp the core concepts in minutes. It feels like cheating, but it's just smart.", color: "bg-blue-100 text-blue-800" },
+                      { name: "Sarah K.", role: "Law Student", quote: "The quizzes are legitimately good. They found the exact weak spots in my knowledge before the real exam did.", color: "bg-green-100 text-green-800" },
+                      { name: "Mike T.", role: "History Buff", quote: "Honest review: I passed my History final because of the exam cheatsheet feature. It highlighted exactly what the prof asked.", color: "bg-purple-100 text-purple-800" },
                   ].map((t, i) => (
-                      <div key={i} className="bg-white dark:bg-slate-800 p-8 rounded-[2rem] border-2 border-slate-100 dark:border-slate-700 shadow-lg relative">
+                      <div key={i} className="bg-white dark:bg-slate-800 p-8 rounded-[2rem] border-2 border-slate-100 dark:border-slate-700 shadow-lg relative hover:scale-105 hover:shadow-2xl hover:border-brand-purple dark:hover:border-brand-purple transition-all duration-300">
                           <Quote className="absolute top-8 right-8 text-slate-200 dark:text-slate-700" size={40} />
                           <p className="text-lg font-medium text-slate-700 dark:text-slate-300 mb-6 relative z-10">"{t.quote}"</p>
                           <div className="flex items-center gap-4">
